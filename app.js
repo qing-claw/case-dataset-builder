@@ -4,8 +4,7 @@ const PRESET_DIMENSIONS = [
   '复杂构图能力',
   '指令遵循',
   '提示词适配能力',
-  '边界案例',
-  '自定义'
+  '边界案例'
 ];
 
 const PRESET_SUB_DIMENSIONS = [
@@ -15,8 +14,7 @@ const PRESET_SUB_DIMENSIONS = [
   '数量约束遵循',
   '中英文 prompt 适配',
   '风格混合',
-  '极端姿势稳定性',
-  '自定义'
+  '极端姿势稳定性'
 ];
 
 const STORAGE_KEY = 'case-dataset-builder:v1';
@@ -26,6 +24,8 @@ const state = {
   cases: [],
   selectedId: null,
   theme: 'light',
+  dimensionOptions: [...PRESET_DIMENSIONS],
+  subDimensionOptions: [...PRESET_SUB_DIMENSIONS],
 };
 
 const els = {
@@ -52,6 +52,8 @@ const els = {
   subDimensionSelect: document.getElementById('sub-dimension-select'),
   addDimensionSelectBtn: document.getElementById('add-dimension-select-btn'),
   addSubDimensionSelectBtn: document.getElementById('add-sub-dimension-select-btn'),
+  showDimensionCustomBtn: document.getElementById('show-dimension-custom-btn'),
+  showSubDimensionCustomBtn: document.getElementById('show-sub-dimension-custom-btn'),
   dimensionCustomWrap: document.getElementById('dimension-custom-wrap'),
   subDimensionCustomWrap: document.getElementById('sub-dimension-custom-wrap'),
   dimensionCustomInput: document.getElementById('dimension-custom-input'),
@@ -70,14 +72,6 @@ const els = {
 function uid() {
   if (crypto?.randomUUID) return crypto.randomUUID();
   return Math.random().toString(36).slice(2, 10);
-}
-
-function slugify(text) {
-  return (text || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 48) || `case_${Date.now()}`;
 }
 
 function createEmptyCase() {
@@ -117,6 +111,8 @@ function persistState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     selectedId: state.selectedId,
     cases: state.cases.map(serializableCase),
+    dimensionOptions: state.dimensionOptions,
+    subDimensionOptions: state.subDimensionOptions,
   }));
 }
 
@@ -142,6 +138,8 @@ function restoreState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
+    state.dimensionOptions = dedupe([...(parsed.dimensionOptions || []), ...PRESET_DIMENSIONS]);
+    state.subDimensionOptions = dedupe([...(parsed.subDimensionOptions || []), ...PRESET_SUB_DIMENSIONS]);
     state.cases = (parsed.cases || []).map((c) => ({
       id: c.id || uid(),
       folderName: c.folderName || `case_${Date.now()}`,
@@ -169,6 +167,10 @@ function restoreState() {
     console.error('restoreState failed', error);
     return false;
   }
+}
+
+function dedupe(list) {
+  return [...new Set(list.map((x) => x.trim()).filter(Boolean))];
 }
 
 function getSelectedCase() {
@@ -200,13 +202,13 @@ function populateSelect(selectEl, values, placeholder) {
 }
 
 function renderFilters() {
-  const values = new Set(PRESET_DIMENSIONS.filter((v) => v !== '自定义'));
-  state.cases.forEach((c) => c.dimension.forEach((d) => values.add(d)));
+  const filterValues = new Set(state.dimensionOptions);
+  state.cases.forEach((c) => c.dimension.forEach((d) => filterValues.add(d)));
   const current = els.dimensionFilter.value;
-  els.dimensionFilter.innerHTML = '<option value="">全部维度</option>' + [...values].map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  els.dimensionFilter.innerHTML = '<option value="">全部维度</option>' + [...filterValues].map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
   els.dimensionFilter.value = current;
-  populateSelect(els.dimensionSelect, PRESET_DIMENSIONS, '选择一个维度');
-  populateSelect(els.subDimensionSelect, PRESET_SUB_DIMENSIONS, '选择一个子项');
+  populateSelect(els.dimensionSelect, state.dimensionOptions, '选择一个维度');
+  populateSelect(els.subDimensionSelect, state.subDimensionOptions, '选择一个子项');
 }
 
 function renderCaseList() {
@@ -237,9 +239,7 @@ function renderCaseList() {
       </div>`;
   }).join('');
 
-  document.querySelectorAll('[data-case-id]').forEach((node) => {
-    node.addEventListener('click', () => selectCase(node.dataset.caseId));
-  });
+  document.querySelectorAll('[data-case-id]').forEach((node) => node.addEventListener('click', () => selectCase(node.dataset.caseId)));
 }
 
 function renderTokenList(container, values, onRemove) {
@@ -367,6 +367,14 @@ function addUniqueItem(field, value) {
   syncSelectedCase();
 }
 
+function addOptionAndAttach(kind, value) {
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  if (kind === 'dimension') state.dimensionOptions = dedupe([...state.dimensionOptions, trimmed]);
+  if (kind === 'sub_dimension') state.subDimensionOptions = dedupe([...state.subDimensionOptions, trimmed]);
+  addUniqueItem(kind, trimmed);
+}
+
 function addCheckPoint() {
   const value = els.checkPointInput.value.trim();
   if (!value) return;
@@ -487,6 +495,8 @@ async function importDatasetZip(file) {
       check_points: data.check_points || [],
       pass_rule: data.pass_rule || '',
     });
+    state.dimensionOptions = dedupe([...state.dimensionOptions, ...(data.dimension || [])]);
+    state.subDimensionOptions = dedupe([...state.subDimensionOptions, ...(data.sub_dimension || [])]);
   }
 
   state.cases.forEach((c) => c.ref.forEach((r) => URL.revokeObjectURL(r.url)));
@@ -495,16 +505,11 @@ async function importDatasetZip(file) {
   syncSelectedCase();
 }
 
-function bindDimensionSelect(selectEl, customWrap, customInput, addFn) {
-  selectEl.addEventListener('change', () => {
-    if (selectEl.value === '自定义') {
-      customWrap.classList.remove('hidden');
-      customInput.focus();
-    } else {
-      customWrap.classList.add('hidden');
-    }
-  });
-  addFn();
+function toggleCustomWrap(kind, show) {
+  const wrap = kind === 'dimension' ? els.dimensionCustomWrap : els.subDimensionCustomWrap;
+  const input = kind === 'dimension' ? els.dimensionCustomInput : els.subDimensionCustomInput;
+  wrap.classList.toggle('hidden', !show);
+  if (show) input.focus();
 }
 
 function bindEvents() {
@@ -521,7 +526,7 @@ function bindEvents() {
     const cloned = {
       ...structuredClone({ ...c, ref: [], id: undefined }),
       id: uid(),
-      folderName: `${slugify(c.folderName)}_copy`,
+      folderName: `${c.folderName}_copy`,
       ref: c.ref.map((ref, idx) => ({ id: uid(), file: ref.file, url: URL.createObjectURL(ref.file), relativePath: `ref/ref_${String(idx + 1).padStart(2, '0')}.${ref.file.name.split('.').pop() || 'png'}`, dataUrl: ref.dataUrl })),
     };
     state.cases.unshift(cloned);
@@ -546,28 +551,22 @@ function bindEvents() {
   els.checkPointInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCheckPoint(); } });
   document.querySelector('[data-add="check_points"]').addEventListener('click', addCheckPoint);
 
-  els.addDimensionSelectBtn.addEventListener('click', () => {
-    if (els.dimensionSelect.value && els.dimensionSelect.value !== '自定义') addUniqueItem('dimension', els.dimensionSelect.value);
-  });
-  els.addSubDimensionSelectBtn.addEventListener('click', () => {
-    if (els.subDimensionSelect.value && els.subDimensionSelect.value !== '自定义') addUniqueItem('sub_dimension', els.subDimensionSelect.value);
-  });
+  els.addDimensionSelectBtn.addEventListener('click', () => addUniqueItem('dimension', els.dimensionSelect.value));
+  els.addSubDimensionSelectBtn.addEventListener('click', () => addUniqueItem('sub_dimension', els.subDimensionSelect.value));
+  els.showDimensionCustomBtn.addEventListener('click', () => toggleCustomWrap('dimension', true));
+  els.showSubDimensionCustomBtn.addEventListener('click', () => toggleCustomWrap('sub_dimension', true));
   els.confirmDimensionCustomBtn.addEventListener('click', () => {
-    addUniqueItem('dimension', els.dimensionCustomInput.value);
+    addOptionAndAttach('dimension', els.dimensionCustomInput.value);
     els.dimensionCustomInput.value = '';
-    els.dimensionCustomWrap.classList.add('hidden');
-    els.dimensionSelect.value = '';
+    toggleCustomWrap('dimension', false);
   });
   els.confirmSubDimensionCustomBtn.addEventListener('click', () => {
-    addUniqueItem('sub_dimension', els.subDimensionCustomInput.value);
+    addOptionAndAttach('sub_dimension', els.subDimensionCustomInput.value);
     els.subDimensionCustomInput.value = '';
-    els.subDimensionCustomWrap.classList.add('hidden');
-    els.subDimensionSelect.value = '';
+    toggleCustomWrap('sub_dimension', false);
   });
   els.dimensionCustomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); els.confirmDimensionCustomBtn.click(); } });
   els.subDimensionCustomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); els.confirmSubDimensionCustomBtn.click(); } });
-  els.dimensionSelect.addEventListener('change', () => els.dimensionCustomWrap.classList.toggle('hidden', els.dimensionSelect.value !== '自定义'));
-  els.subDimensionSelect.addEventListener('change', () => els.subDimensionCustomWrap.classList.toggle('hidden', els.subDimensionSelect.value !== '自定义'));
 
   els.addPromptBtn.addEventListener('click', () => {
     const c = getSelectedCase();
