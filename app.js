@@ -4,7 +4,19 @@ const PRESET_DIMENSIONS = [
   '复杂构图能力',
   '指令遵循',
   '提示词适配能力',
-  '边界案例'
+  '边界案例',
+  '自定义'
+];
+
+const PRESET_SUB_DIMENSIONS = [
+  '指定画风还原',
+  '角色换装遵循',
+  '多人物互动',
+  '数量约束遵循',
+  '中英文 prompt 适配',
+  '风格混合',
+  '极端姿势稳定性',
+  '自定义'
 ];
 
 const STORAGE_KEY = 'case-dataset-builder:v1';
@@ -36,13 +48,22 @@ const els = {
   subDimensionList: document.getElementById('sub-dimension-list'),
   promptList: document.getElementById('prompt-list'),
   checkPointList: document.getElementById('check-point-list'),
-  dimensionInput: document.getElementById('dimension-input'),
-  subDimensionInput: document.getElementById('sub-dimension-input'),
+  dimensionSelect: document.getElementById('dimension-select'),
+  subDimensionSelect: document.getElementById('sub-dimension-select'),
+  addDimensionSelectBtn: document.getElementById('add-dimension-select-btn'),
+  addSubDimensionSelectBtn: document.getElementById('add-sub-dimension-select-btn'),
+  dimensionCustomWrap: document.getElementById('dimension-custom-wrap'),
+  subDimensionCustomWrap: document.getElementById('sub-dimension-custom-wrap'),
+  dimensionCustomInput: document.getElementById('dimension-custom-input'),
+  subDimensionCustomInput: document.getElementById('sub-dimension-custom-input'),
+  confirmDimensionCustomBtn: document.getElementById('confirm-dimension-custom-btn'),
+  confirmSubDimensionCustomBtn: document.getElementById('confirm-sub-dimension-custom-btn'),
   checkPointInput: document.getElementById('check-point-input'),
   addPromptBtn: document.getElementById('add-prompt-btn'),
   passRule: document.getElementById('pass-rule'),
   refUpload: document.getElementById('ref-upload'),
   refGrid: document.getElementById('ref-grid'),
+  refDropzone: document.getElementById('ref-dropzone'),
   validationBox: document.getElementById('validation-box'),
 };
 
@@ -93,20 +114,17 @@ function serializableCase(c) {
 }
 
 function persistState() {
-  const payload = {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
     selectedId: state.selectedId,
     cases: state.cases.map(serializableCase),
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }));
 }
 
 function applyTheme(theme) {
   state.theme = theme;
   document.body.classList.toggle('dark', theme === 'dark');
-  if (els.themeToggleBtn) {
-    els.themeToggleBtn.textContent = theme === 'dark' ? '☀' : '☾';
-    els.themeToggleBtn.title = theme === 'dark' ? '切换到浅色模式' : '切换到深色模式';
-  }
+  els.themeToggleBtn.textContent = theme === 'dark' ? '☀' : '☾';
+  els.themeToggleBtn.title = theme === 'dark' ? '切换到浅色模式' : '切换到深色模式';
   localStorage.setItem(THEME_KEY, theme);
 }
 
@@ -161,7 +179,7 @@ function caseToExportPayload(c) {
   return {
     dimension: c.dimension,
     sub_dimension: c.sub_dimension,
-    prompt: c.prompt.filter(Boolean),
+    prompt: c.prompt.filter((x) => x.trim()),
     ref: c.ref.map((r) => r.relativePath),
     check_points: c.check_points,
     pass_rule: c.pass_rule || '',
@@ -177,13 +195,18 @@ function validateCase(c) {
   return errors;
 }
 
+function populateSelect(selectEl, values, placeholder) {
+  selectEl.innerHTML = [`<option value="">${placeholder}</option>`, ...values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`)].join('');
+}
+
 function renderFilters() {
-  const values = new Set(PRESET_DIMENSIONS);
+  const values = new Set(PRESET_DIMENSIONS.filter((v) => v !== '自定义'));
   state.cases.forEach((c) => c.dimension.forEach((d) => values.add(d)));
   const current = els.dimensionFilter.value;
-  els.dimensionFilter.innerHTML = '<option value="">全部维度</option>' +
-    [...values].map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  els.dimensionFilter.innerHTML = '<option value="">全部维度</option>' + [...values].map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
   els.dimensionFilter.value = current;
+  populateSelect(els.dimensionSelect, PRESET_DIMENSIONS, '选择一个维度');
+  populateSelect(els.subDimensionSelect, PRESET_SUB_DIMENSIONS, '选择一个子项');
 }
 
 function renderCaseList() {
@@ -191,9 +214,7 @@ function renderCaseList() {
   const dim = els.dimensionFilter.value;
   const filtered = state.cases.filter((c) => {
     const haystack = [c.folderName, ...c.dimension, ...c.sub_dimension, ...c.prompt].join(' ').toLowerCase();
-    const matchSearch = !search || haystack.includes(search);
-    const matchDim = !dim || c.dimension.includes(dim);
-    return matchSearch && matchDim;
+    return (!search || haystack.includes(search)) && (!dim || c.dimension.includes(dim));
   });
 
   if (filtered.length === 0) {
@@ -232,9 +253,7 @@ function renderTokenList(container, values, onRemove) {
       <button class="mini-btn" data-remove-index="${index}">×</button>
     </span>
   `).join('');
-  container.querySelectorAll('[data-remove-index]').forEach((btn) => {
-    btn.addEventListener('click', () => onRemove(Number(btn.dataset.removeIndex)));
-  });
+  container.querySelectorAll('[data-remove-index]').forEach((btn) => btn.addEventListener('click', () => onRemove(Number(btn.dataset.removeIndex))));
 }
 
 function renderPrompts(c) {
@@ -250,8 +269,7 @@ function renderPrompts(c) {
 
   els.promptList.querySelectorAll('[data-prompt-index]').forEach((textarea) => {
     textarea.addEventListener('input', () => {
-      const current = getSelectedCase();
-      current.prompt[Number(textarea.dataset.promptIndex)] = textarea.value;
+      getSelectedCase().prompt[Number(textarea.dataset.promptIndex)] = textarea.value;
       syncSelectedCase();
     });
   });
@@ -259,11 +277,9 @@ function renderPrompts(c) {
   els.promptList.querySelectorAll('[data-remove-prompt]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const current = getSelectedCase();
-      if (current.prompt.length === 1) {
-        current.prompt[0] = '';
-      } else {
-        current.prompt.splice(Number(btn.dataset.removePrompt), 1);
-      }
+      const idx = Number(btn.dataset.removePrompt);
+      if (current.prompt.length === 1) current.prompt[0] = '';
+      else current.prompt.splice(idx, 1);
       syncSelectedCase();
     });
   });
@@ -288,15 +304,13 @@ function renderRefs(c) {
       </div>
     </div>
   `).join('');
-  els.refGrid.querySelectorAll('[data-remove-ref]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const current = getSelectedCase();
-      const idx = Number(btn.dataset.removeRef);
-      URL.revokeObjectURL(current.ref[idx].url);
-      current.ref.splice(idx, 1);
-      syncSelectedCase();
-    });
-  });
+  els.refGrid.querySelectorAll('[data-remove-ref]').forEach((btn) => btn.addEventListener('click', () => {
+    const current = getSelectedCase();
+    const idx = Number(btn.dataset.removeRef);
+    URL.revokeObjectURL(current.ref[idx].url);
+    current.ref.splice(idx, 1);
+    syncSelectedCase();
+  }));
 }
 
 function renderSelectedCase() {
@@ -310,22 +324,17 @@ function renderSelectedCase() {
   }
 
   els.editorTitle.textContent = c.folderName;
-  els.editorSubtitle.textContent = c.dimension.join(' / ') || '先补维度，不然导出的时候会很诚实地报错';
+  els.editorSubtitle.textContent = c.dimension.join(' / ') || '先补维度';
   els.folderName.value = c.folderName;
   els.passRule.value = c.pass_rule;
+  els.dimensionCustomWrap.classList.add('hidden');
+  els.subDimensionCustomWrap.classList.add('hidden');
+  els.dimensionSelect.value = '';
+  els.subDimensionSelect.value = '';
 
-  renderTokenList(els.dimensionList, c.dimension, (index) => {
-    c.dimension.splice(index, 1);
-    syncSelectedCase();
-  });
-  renderTokenList(els.subDimensionList, c.sub_dimension, (index) => {
-    c.sub_dimension.splice(index, 1);
-    syncSelectedCase();
-  });
-  renderTokenList(els.checkPointList, c.check_points, (index) => {
-    c.check_points.splice(index, 1);
-    syncSelectedCase();
-  });
+  renderTokenList(els.dimensionList, c.dimension, (index) => { c.dimension.splice(index, 1); syncSelectedCase(); });
+  renderTokenList(els.subDimensionList, c.sub_dimension, (index) => { c.sub_dimension.splice(index, 1); syncSelectedCase(); });
+  renderTokenList(els.checkPointList, c.check_points, (index) => { c.check_points.splice(index, 1); syncSelectedCase(); });
   renderPrompts(c);
   renderRefs(c);
 
@@ -349,14 +358,20 @@ function selectCase(id) {
   renderSelectedCase();
 }
 
-function addItem(field, input) {
+function addUniqueItem(field, value) {
   const c = getSelectedCase();
   if (!c) return;
-  const value = input.value.trim();
-  if (!value) return;
-  c[field].push(value);
-  input.value = '';
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  if (!c[field].includes(trimmed)) c[field].push(trimmed);
   syncSelectedCase();
+}
+
+function addCheckPoint() {
+  const value = els.checkPointInput.value.trim();
+  if (!value) return;
+  addUniqueItem('check_points', value);
+  els.checkPointInput.value = '';
 }
 
 function escapeHtml(value) {
@@ -371,58 +386,37 @@ async function exportCurrentCase() {
   const c = getSelectedCase();
   if (!c) return;
   const errors = validateCase(c);
-  if (errors.length) {
-    alert(errors.join('\n'));
-    return;
-  }
+  if (errors.length) return alert(errors.join('\n'));
   const zip = new JSZip();
   const folder = zip.folder(c.folderName);
   folder.file('case.json', JSON.stringify(caseToExportPayload(c), null, 2));
   if (c.ref.length) {
     const refFolder = folder.folder('ref');
-    c.ref.forEach((ref) => {
-      refFolder.file(ref.relativePath.replace(/^ref\//, ''), ref.file);
-    });
+    c.ref.forEach((ref) => refFolder.file(ref.relativePath.replace(/^ref\//, ''), ref.file));
   }
-  const blob = await zip.generateAsync({ type: 'blob' });
-  downloadBlob(blob, `${c.folderName}.zip`);
+  downloadBlob(await zip.generateAsync({ type: 'blob' }), `${c.folderName}.zip`);
 }
 
 async function exportDataset() {
   const invalid = state.cases.map((c) => ({ c, errors: validateCase(c) })).filter((x) => x.errors.length);
-  if (invalid.length) {
-    alert(`还有 ${invalid.length} 条 case 不可导出。先补齐必填项。`);
-    return;
-  }
+  if (invalid.length) return alert(`还有 ${invalid.length} 条 case 不可导出。先补齐必填项。`);
   const zip = new JSZip();
   const root = zip.folder('dataset');
   const casesRoot = root.folder('cases');
-
   state.cases.forEach((c) => {
     const folder = casesRoot.folder(c.folderName);
     folder.file('case.json', JSON.stringify(caseToExportPayload(c), null, 2));
     if (c.ref.length) {
       const refFolder = folder.folder('ref');
-      c.ref.forEach((ref) => {
-        refFolder.file(ref.relativePath.replace(/^ref\//, ''), ref.file);
-      });
+      c.ref.forEach((ref) => refFolder.file(ref.relativePath.replace(/^ref\//, ''), ref.file));
     }
   });
-
   root.file('dataset_summary.json', JSON.stringify({
     total_cases: state.cases.length,
     exported_at: new Date().toISOString(),
-    cases: state.cases.map((c) => ({
-      folder: c.folderName,
-      dimension: c.dimension,
-      sub_dimension: c.sub_dimension,
-      ref_count: c.ref.length,
-      prompt_count: c.prompt.filter(Boolean).length,
-    })),
+    cases: state.cases.map((c) => ({ folder: c.folderName, dimension: c.dimension, sub_dimension: c.sub_dimension, ref_count: c.ref.length, prompt_count: c.prompt.filter((x) => x.trim()).length })),
   }, null, 2));
-
-  const blob = await zip.generateAsync({ type: 'blob' });
-  downloadBlob(blob, `case_dataset_${Date.now()}.zip`);
+  downloadBlob(await zip.generateAsync({ type: 'blob' }), `case_dataset_${Date.now()}.zip`);
 }
 
 function downloadBlob(blob, filename) {
@@ -445,46 +439,44 @@ function fileToDataUrl(file) {
   });
 }
 
+async function addRefFiles(files) {
+  const c = getSelectedCase();
+  if (!c || !files.length) return;
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    const ext = file.name.split('.').pop() || 'png';
+    const n = c.ref.length + 1;
+    const dataUrl = await fileToDataUrl(file);
+    c.ref.push({
+      id: uid(),
+      file,
+      url: URL.createObjectURL(file),
+      relativePath: `ref/ref_${String(n).padStart(2, '0')}.${ext}`,
+      dataUrl,
+    });
+  }
+  syncSelectedCase();
+}
+
 async function importDatasetZip(file) {
-  if (!window.JSZip) {
-    alert('JSZip 未加载，导入功能暂时不可用。');
-    return;
-  }
-
+  if (!window.JSZip) return alert('JSZip 未加载，导入功能暂时不可用。');
   const zip = await window.JSZip.loadAsync(file);
-  const caseJsonPaths = Object.keys(zip.files)
-    .filter((path) => /(^|\/)case\.json$/.test(path) && !path.includes('__MACOSX') && !path.split('/').pop().startsWith('._'))
-    .sort();
-
-  if (!caseJsonPaths.length) {
-    alert('没有在 ZIP 里找到 case.json。');
-    return;
-  }
+  const caseJsonPaths = Object.keys(zip.files).filter((path) => /(^|\/)case\.json$/.test(path) && !path.includes('__MACOSX') && !path.split('/').pop().startsWith('._')).sort();
+  if (!caseJsonPaths.length) return alert('没有在 ZIP 里找到 case.json。');
 
   const importedCases = [];
   for (const caseJsonPath of caseJsonPaths) {
-    const jsonText = await zip.file(caseJsonPath).async('string');
-    const data = JSON.parse(jsonText);
+    const data = JSON.parse(await zip.file(caseJsonPath).async('string'));
     const folderPath = caseJsonPath.slice(0, -'case.json'.length);
     const folderName = folderPath.split('/').filter(Boolean).pop() || `case_${importedCases.length + 1}`;
-
     const refs = [];
     for (const relativePath of data.ref || []) {
-      const zipPath = `${folderPath}${relativePath}`;
-      const entry = zip.file(zipPath);
+      const entry = zip.file(`${folderPath}${relativePath}`);
       if (!entry) continue;
       const blob = await entry.async('blob');
       const fileObj = new File([blob], relativePath.split('/').pop(), { type: blob.type || 'image/png' });
-      const dataUrl = await fileToDataUrl(fileObj);
-      refs.push({
-        id: uid(),
-        file: fileObj,
-        url: URL.createObjectURL(fileObj),
-        relativePath,
-        dataUrl,
-      });
+      refs.push({ id: uid(), file: fileObj, url: URL.createObjectURL(fileObj), relativePath, dataUrl: await fileToDataUrl(fileObj) });
     }
-
     importedCases.push({
       id: uid(),
       folderName,
@@ -503,18 +495,26 @@ async function importDatasetZip(file) {
   syncSelectedCase();
 }
 
-function bindEvents() {
-  els.themeToggleBtn.addEventListener('click', () => {
-    applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+function bindDimensionSelect(selectEl, customWrap, customInput, addFn) {
+  selectEl.addEventListener('change', () => {
+    if (selectEl.value === '自定义') {
+      customWrap.classList.remove('hidden');
+      customInput.focus();
+    } else {
+      customWrap.classList.add('hidden');
+    }
   });
+  addFn();
+}
 
+function bindEvents() {
+  els.themeToggleBtn.addEventListener('click', () => applyTheme(state.theme === 'dark' ? 'light' : 'dark'));
   els.addCaseBtn.addEventListener('click', () => {
     const newCase = createEmptyCase();
     state.cases.unshift(newCase);
     state.selectedId = newCase.id;
     syncSelectedCase();
   });
-
   els.duplicateCaseBtn.addEventListener('click', () => {
     const c = getSelectedCase();
     if (!c) return;
@@ -522,19 +522,12 @@ function bindEvents() {
       ...structuredClone({ ...c, ref: [], id: undefined }),
       id: uid(),
       folderName: `${slugify(c.folderName)}_copy`,
-      ref: c.ref.map((ref, idx) => ({
-        id: uid(),
-        file: ref.file,
-        url: URL.createObjectURL(ref.file),
-        relativePath: `ref/ref_${String(idx + 1).padStart(2, '0')}.${ref.file.name.split('.').pop() || 'png'}`,
-        dataUrl: ref.dataUrl,
-      })),
+      ref: c.ref.map((ref, idx) => ({ id: uid(), file: ref.file, url: URL.createObjectURL(ref.file), relativePath: `ref/ref_${String(idx + 1).padStart(2, '0')}.${ref.file.name.split('.').pop() || 'png'}`, dataUrl: ref.dataUrl })),
     };
     state.cases.unshift(cloned);
     state.selectedId = cloned.id;
     syncSelectedCase();
   });
-
   els.deleteCaseBtn.addEventListener('click', () => {
     const c = getSelectedCase();
     if (!c) return;
@@ -544,47 +537,37 @@ function bindEvents() {
     state.selectedId = state.cases[0]?.id || null;
     syncSelectedCase();
   });
-
   els.exportCaseBtn.addEventListener('click', exportCurrentCase);
   els.exportDatasetBtn.addEventListener('click', exportDataset);
   els.searchInput.addEventListener('input', renderCaseList);
   els.dimensionFilter.addEventListener('change', renderCaseList);
+  els.folderName.addEventListener('input', () => { const c = getSelectedCase(); if (!c) return; c.folderName = els.folderName.value; syncSelectedCase(); });
+  els.passRule.addEventListener('input', () => { const c = getSelectedCase(); if (!c) return; c.pass_rule = els.passRule.value; syncSelectedCase(); });
+  els.checkPointInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCheckPoint(); } });
+  document.querySelector('[data-add="check_points"]').addEventListener('click', addCheckPoint);
 
-  els.folderName.addEventListener('input', () => {
-    const c = getSelectedCase();
-    if (!c) return;
-    c.folderName = els.folderName.value;
-    syncSelectedCase();
+  els.addDimensionSelectBtn.addEventListener('click', () => {
+    if (els.dimensionSelect.value && els.dimensionSelect.value !== '自定义') addUniqueItem('dimension', els.dimensionSelect.value);
   });
-
-  els.passRule.addEventListener('input', () => {
-    const c = getSelectedCase();
-    if (!c) return;
-    c.pass_rule = els.passRule.value;
-    syncSelectedCase();
+  els.addSubDimensionSelectBtn.addEventListener('click', () => {
+    if (els.subDimensionSelect.value && els.subDimensionSelect.value !== '自定义') addUniqueItem('sub_dimension', els.subDimensionSelect.value);
   });
-
-  document.querySelectorAll('[data-add]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const field = btn.dataset.add;
-      if (field === 'dimension') addItem('dimension', els.dimensionInput);
-      if (field === 'sub_dimension') addItem('sub_dimension', els.subDimensionInput);
-      if (field === 'check_points') addItem('check_points', els.checkPointInput);
-    });
+  els.confirmDimensionCustomBtn.addEventListener('click', () => {
+    addUniqueItem('dimension', els.dimensionCustomInput.value);
+    els.dimensionCustomInput.value = '';
+    els.dimensionCustomWrap.classList.add('hidden');
+    els.dimensionSelect.value = '';
   });
-
-  [
-    [els.dimensionInput, 'dimension'],
-    [els.subDimensionInput, 'sub_dimension'],
-    [els.checkPointInput, 'check_points'],
-  ].forEach(([input, field]) => {
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        addItem(field, input);
-      }
-    });
+  els.confirmSubDimensionCustomBtn.addEventListener('click', () => {
+    addUniqueItem('sub_dimension', els.subDimensionCustomInput.value);
+    els.subDimensionCustomInput.value = '';
+    els.subDimensionCustomWrap.classList.add('hidden');
+    els.subDimensionSelect.value = '';
   });
+  els.dimensionCustomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); els.confirmDimensionCustomBtn.click(); } });
+  els.subDimensionCustomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); els.confirmSubDimensionCustomBtn.click(); } });
+  els.dimensionSelect.addEventListener('change', () => els.dimensionCustomWrap.classList.toggle('hidden', els.dimensionSelect.value !== '自定义'));
+  els.subDimensionSelect.addEventListener('change', () => els.subDimensionCustomWrap.classList.toggle('hidden', els.subDimensionSelect.value !== '自定义'));
 
   els.addPromptBtn.addEventListener('click', () => {
     const c = getSelectedCase();
@@ -594,24 +577,22 @@ function bindEvents() {
   });
 
   els.refUpload.addEventListener('change', async () => {
-    const c = getSelectedCase();
-    if (!c) return;
-    const files = Array.from(els.refUpload.files || []);
-    for (let idx = 0; idx < files.length; idx += 1) {
-      const file = files[idx];
-      const ext = file.name.split('.').pop() || 'png';
-      const n = c.ref.length + 1;
-      const dataUrl = await fileToDataUrl(file);
-      c.ref.push({
-        id: uid(),
-        file,
-        url: URL.createObjectURL(file),
-        relativePath: `ref/ref_${String(n).padStart(2, '0')}.${ext}`,
-        dataUrl,
-      });
-    }
+    await addRefFiles(Array.from(els.refUpload.files || []));
     els.refUpload.value = '';
-    syncSelectedCase();
+  });
+
+  ['dragenter', 'dragover'].forEach((eventName) => {
+    els.refDropzone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      els.refDropzone.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach((eventName) => {
+    els.refDropzone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      if (eventName === 'drop') addRefFiles(Array.from(e.dataTransfer.files || []));
+      els.refDropzone.classList.remove('dragover');
+    });
   });
 
   els.importZipInput.addEventListener('change', async () => {
@@ -623,8 +604,7 @@ function bindEvents() {
 }
 
 function init() {
-  const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
-  applyTheme(savedTheme);
+  applyTheme(localStorage.getItem(THEME_KEY) || 'light');
   renderFilters();
   bindEvents();
   const restored = restoreState();

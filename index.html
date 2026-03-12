@@ -57,7 +57,24 @@
         </section>
 
         <section id="editor" class="editor hidden">
-          <div class="editor-grid simple">
+          <div class="editor-grid two-column">
+            <section class="card ref-card left-sticky">
+              <div class="field">
+                <div class="field-row">
+                  <label>参考图 / 参考素材</label>
+                  <label class="upload-btn slim">
+                    上传参考图
+                    <input id="ref-upload" type="file" accept="image/*" multiple hidden />
+                  </label>
+                </div>
+                <div id="ref-dropzone" class="ref-dropzone">
+                  <strong>拖拽图片到这里</strong>
+                  <p>也可以点右上角上传。会自动写成 `ref/ref_XX.ext`。</p>
+                </div>
+                <div id="ref-grid" class="ref-grid empty">暂无参考图</div>
+              </div>
+            </section>
+
             <section class="card form-card single-column">
               <div class="field">
                 <label for="folder-name">文件夹名</label>
@@ -66,20 +83,32 @@
               </div>
 
               <div class="field">
-                <label>dimension（字符串列表）</label>
+                <label>dimension（多选）</label>
                 <div id="dimension-list" class="token-list"></div>
-                <div class="inline-add">
-                  <input id="dimension-input" type="text" placeholder="输入一个评测维度后回车" />
-                  <button data-add="dimension">添加</button>
+                <div class="select-add-row">
+                  <select id="dimension-select">
+                    <option value="">选择一个维度</option>
+                  </select>
+                  <button id="add-dimension-select-btn">添加</button>
+                </div>
+                <div id="dimension-custom-wrap" class="inline-add hidden">
+                  <input id="dimension-custom-input" type="text" placeholder="输入自定义 dimension" />
+                  <button id="confirm-dimension-custom-btn">确认</button>
                 </div>
               </div>
 
               <div class="field">
-                <label>sub_dimension（字符串列表）</label>
+                <label>sub_dimension（多选）</label>
                 <div id="sub-dimension-list" class="token-list"></div>
-                <div class="inline-add">
-                  <input id="sub-dimension-input" type="text" placeholder="输入一个子项后回车" />
-                  <button data-add="sub_dimension">添加</button>
+                <div class="select-add-row">
+                  <select id="sub-dimension-select">
+                    <option value="">选择一个子项</option>
+                  </select>
+                  <button id="add-sub-dimension-select-btn">添加</button>
+                </div>
+                <div id="sub-dimension-custom-wrap" class="inline-add hidden">
+                  <input id="sub-dimension-custom-input" type="text" placeholder="输入自定义 sub_dimension" />
+                  <button id="confirm-sub-dimension-custom-btn">确认</button>
                 </div>
               </div>
 
@@ -101,17 +130,6 @@
               <div class="field">
                 <label for="pass-rule">pass_rule（可选）</label>
                 <textarea id="pass-rule" rows="3" placeholder="例如：3 个检查点满足 2 个及以上算通过"></textarea>
-              </div>
-
-              <div class="field">
-                <div class="field-row">
-                  <label>参考图 / 参考素材</label>
-                  <label class="upload-btn slim">
-                    上传参考图
-                    <input id="ref-upload" type="file" accept="image/*" multiple hidden />
-                  </label>
-                </div>
-                <div id="ref-grid" class="ref-grid empty">暂无参考图</div>
               </div>
 
               <div id="validation-box" class="validation-box"></div>
