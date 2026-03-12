@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Case Dataset Builder</title>
+    <meta name="description" content="一个可部署到 GitHub Pages 的动漫文生图 case 数据集制作工具。" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div>
+            <h1>Case Dataset Builder</h1>
+            <p>按新标准制作动漫文生图 case，可直接部署到 GitHub Pages。</p>
+          </div>
+          <button id="add-case-btn" class="primary">新建 case</button>
+        </div>
+
+        <div class="sidebar-tools">
+          <input id="search-input" type="search" placeholder="搜索维度 / 子项 / prompt" />
+          <select id="dimension-filter">
+            <option value="">全部维度</option>
+          </select>
+        </div>
+
+        <div id="case-list" class="case-list"></div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <h2 id="editor-title">未选择 case</h2>
+            <p id="editor-subtitle">一个 case 一个子文件夹，导出为 case.json + ref/</p>
+          </div>
+          <div class="topbar-actions">
+            <label class="import-btn">
+              导入数据集 ZIP
+              <input id="import-zip-input" type="file" accept=".zip" hidden />
+            </label>
+            <button id="duplicate-case-btn">复制 case</button>
+            <button id="delete-case-btn" class="danger">删除 case</button>
+            <button id="export-case-btn">导出当前 case</button>
+            <button id="export-dataset-btn" class="primary">导出数据集 ZIP</button>
+          </div>
+        </header>
+
+        <section id="empty-state" class="empty-state">
+          <h3>先建第一条 case</h3>
+          <p>字段按新标准：dimension / sub_dimension / prompt / ref / check_points / pass_rule。</p>
+        </section>
+
+        <section id="editor" class="editor hidden">
+          <div class="editor-grid">
+            <section class="card form-card">
+              <div class="field">
+                <label for="folder-name">文件夹名</label>
+                <input id="folder-name" type="text" placeholder="例如：style_restore_001" />
+                <small>用于导出目录名。建议简洁、可读、可排序。</small>
+              </div>
+
+              <div class="field">
+                <label>dimension（字符串列表）</label>
+                <div id="dimension-list" class="token-list"></div>
+                <div class="inline-add">
+                  <input id="dimension-input" type="text" placeholder="输入一个评测维度后回车" />
+                  <button data-add="dimension">添加</button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>sub_dimension（字符串列表）</label>
+                <div id="sub-dimension-list" class="token-list"></div>
+                <div class="inline-add">
+                  <input id="sub-dimension-input" type="text" placeholder="输入一个子项后回车" />
+                  <button data-add="sub_dimension">添加</button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>prompt（字符串列表）</label>
+                <div id="prompt-list" class="textarea-list"></div>
+                <button id="add-prompt-btn">新增 prompt</button>
+              </div>
+
+              <div class="field">
+                <label>check_points（可选，字符串列表）</label>
+                <div id="check-point-list" class="token-list"></div>
+                <div class="inline-add">
+                  <input id="check-point-input" type="text" placeholder="输入一个检查点后回车" />
+                  <button data-add="check_points">添加</button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="pass-rule">pass_rule（可选，字符串）</label>
+                <textarea id="pass-rule" rows="3" placeholder="例如：3 个检查点满足 2 个及以上算通过"></textarea>
+              </div>
+            </section>
+
+            <section class="card ref-card">
+              <div class="card-header">
+                <div>
+                  <h3>参考图 / 参考素材</h3>
+                  <p>上传后自动放到当前 case 的 ref/ 目录，并在 JSON 里存相对路径。</p>
+                </div>
+                <label class="upload-btn">
+                  上传参考图
+                  <input id="ref-upload" type="file" accept="image/*" multiple hidden />
+                </label>
+              </div>
+
+              <div id="ref-grid" class="ref-grid empty">暂无参考图</div>
+            </section>
+
+            <section class="card preview-card">
+              <div class="card-header">
+                <div>
+                  <h3>case.json 预览</h3>
+                  <p>导出时会写入当前 case 目录。</p>
+                </div>
+              </div>
+              <pre id="json-preview"></pre>
+            </section>
+
+            <section class="card structure-card">
+              <div class="card-header">
+                <div>
+                  <h3>目录结构预览</h3>
+                  <p>统一导出结构，避免大家各填各的。</p>
+                </div>
+              </div>
+              <pre id="structure-preview"></pre>
+              <div id="validation-box" class="validation-box"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
