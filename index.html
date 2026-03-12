@@ -15,9 +15,12 @@
         <div class="sidebar-header">
           <div>
             <h1>Case Dataset Builder</h1>
-            <p>按新标准制作动漫文生图 case，可直接部署到 GitHub Pages。</p>
+            <p>轻一点。先把 case 写清楚，再谈别的。</p>
           </div>
-          <button id="add-case-btn" class="primary">新建 case</button>
+          <div class="sidebar-header-actions">
+            <button id="theme-toggle-btn" class="icon-btn" title="切换明暗模式">☾</button>
+            <button id="add-case-btn" class="primary">新建 case</button>
+          </div>
         </div>
 
         <div class="sidebar-tools">
@@ -31,18 +34,18 @@
       </aside>
 
       <main class="main-panel">
-        <header class="topbar">
+        <header class="topbar compact">
           <div>
             <h2 id="editor-title">未选择 case</h2>
-            <p id="editor-subtitle">一个 case 一个子文件夹，导出为 case.json + ref/</p>
+            <p id="editor-subtitle">一个 case 一个子文件夹</p>
           </div>
           <div class="topbar-actions">
             <label class="import-btn">
-              导入数据集 ZIP
+              导入 ZIP
               <input id="import-zip-input" type="file" accept=".zip" hidden />
             </label>
-            <button id="duplicate-case-btn">复制 case</button>
-            <button id="delete-case-btn" class="danger">删除 case</button>
+            <button id="duplicate-case-btn">复制</button>
+            <button id="delete-case-btn" class="danger">删除</button>
             <button id="export-case-btn">导出当前 case</button>
             <button id="export-dataset-btn" class="primary">导出数据集 ZIP</button>
           </div>
@@ -50,16 +53,16 @@
 
         <section id="empty-state" class="empty-state">
           <h3>先建第一条 case</h3>
-          <p>字段按新标准：dimension / sub_dimension / prompt / ref / check_points / pass_rule。</p>
+          <p>只保留最关键的字段，别让工具比数据本身还吵。</p>
         </section>
 
         <section id="editor" class="editor hidden">
-          <div class="editor-grid">
-            <section class="card form-card">
+          <div class="editor-grid simple">
+            <section class="card form-card single-column">
               <div class="field">
                 <label for="folder-name">文件夹名</label>
                 <input id="folder-name" type="text" placeholder="例如：style_restore_001" />
-                <small>用于导出目录名。建议简洁、可读、可排序。</small>
+                <small>导出时会作为 case 子文件夹名。</small>
               </div>
 
               <div class="field">
@@ -87,7 +90,7 @@
               </div>
 
               <div class="field">
-                <label>check_points（可选，字符串列表）</label>
+                <label>check_points（可选）</label>
                 <div id="check-point-list" class="token-list"></div>
                 <div class="inline-add">
                   <input id="check-point-input" type="text" placeholder="输入一个检查点后回车" />
@@ -96,44 +99,21 @@
               </div>
 
               <div class="field">
-                <label for="pass-rule">pass_rule（可选，字符串）</label>
+                <label for="pass-rule">pass_rule（可选）</label>
                 <textarea id="pass-rule" rows="3" placeholder="例如：3 个检查点满足 2 个及以上算通过"></textarea>
               </div>
-            </section>
 
-            <section class="card ref-card">
-              <div class="card-header">
-                <div>
-                  <h3>参考图 / 参考素材</h3>
-                  <p>上传后自动放到当前 case 的 ref/ 目录，并在 JSON 里存相对路径。</p>
+              <div class="field">
+                <div class="field-row">
+                  <label>参考图 / 参考素材</label>
+                  <label class="upload-btn slim">
+                    上传参考图
+                    <input id="ref-upload" type="file" accept="image/*" multiple hidden />
+                  </label>
                 </div>
-                <label class="upload-btn">
-                  上传参考图
-                  <input id="ref-upload" type="file" accept="image/*" multiple hidden />
-                </label>
+                <div id="ref-grid" class="ref-grid empty">暂无参考图</div>
               </div>
 
-              <div id="ref-grid" class="ref-grid empty">暂无参考图</div>
-            </section>
-
-            <section class="card preview-card">
-              <div class="card-header">
-                <div>
-                  <h3>case.json 预览</h3>
-                  <p>导出时会写入当前 case 目录。</p>
-                </div>
-              </div>
-              <pre id="json-preview"></pre>
-            </section>
-
-            <section class="card structure-card">
-              <div class="card-header">
-                <div>
-                  <h3>目录结构预览</h3>
-                  <p>统一导出结构，避免大家各填各的。</p>
-                </div>
-              </div>
-              <pre id="structure-preview"></pre>
               <div id="validation-box" class="validation-box"></div>
             </section>
           </div>

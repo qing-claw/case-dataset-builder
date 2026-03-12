@@ -8,15 +8,18 @@ const PRESET_DIMENSIONS = [
 ];
 
 const STORAGE_KEY = 'case-dataset-builder:v1';
+const THEME_KEY = 'case-dataset-builder:theme';
 
 const state = {
   cases: [],
   selectedId: null,
+  theme: 'light',
 };
 
 const els = {
   caseList: document.getElementById('case-list'),
   addCaseBtn: document.getElementById('add-case-btn'),
+  themeToggleBtn: document.getElementById('theme-toggle-btn'),
   duplicateCaseBtn: document.getElementById('duplicate-case-btn'),
   deleteCaseBtn: document.getElementById('delete-case-btn'),
   importZipInput: document.getElementById('import-zip-input'),
@@ -40,8 +43,6 @@ const els = {
   passRule: document.getElementById('pass-rule'),
   refUpload: document.getElementById('ref-upload'),
   refGrid: document.getElementById('ref-grid'),
-  jsonPreview: document.getElementById('json-preview'),
-  structurePreview: document.getElementById('structure-preview'),
   validationBox: document.getElementById('validation-box'),
 };
 
@@ -97,6 +98,16 @@ function persistState() {
     cases: state.cases.map(serializableCase),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+}
+
+function applyTheme(theme) {
+  state.theme = theme;
+  document.body.classList.toggle('dark', theme === 'dark');
+  if (els.themeToggleBtn) {
+    els.themeToggleBtn.textContent = theme === 'dark' ? '☀' : '☾';
+    els.themeToggleBtn.title = theme === 'dark' ? '切换到浅色模式' : '切换到深色模式';
+  }
+  localStorage.setItem(THEME_KEY, theme);
 }
 
 function dataUrlToFile(dataUrl, name, type) {
@@ -318,19 +329,11 @@ function renderSelectedCase() {
   renderPrompts(c);
   renderRefs(c);
 
-  const payload = caseToExportPayload(c);
-  els.jsonPreview.textContent = JSON.stringify(payload, null, 2);
-  els.structurePreview.textContent = [
-    `${c.folderName}/`,
-    '  case.json',
-    ...(c.ref.length ? ['  ref/', ...c.ref.map((r) => `    ${r.relativePath.replace(/^ref\//, '')}`)] : []),
-  ].join('\n');
-
   const errors = validateCase(c);
   els.validationBox.className = 'validation-box' + (errors.length ? ' error' : '');
   els.validationBox.innerHTML = errors.length
-    ? `<strong>当前不可导出：</strong><ul>${errors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
-    : '校验通过。至少结构上，它现在像个能交给别人的 case 了。';
+    ? `<strong>还差这几项：</strong><ul>${errors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
+    : '当前 case 已可导出。';
 }
 
 function syncSelectedCase() {
@@ -501,6 +504,10 @@ async function importDatasetZip(file) {
 }
 
 function bindEvents() {
+  els.themeToggleBtn.addEventListener('click', () => {
+    applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+  });
+
   els.addCaseBtn.addEventListener('click', () => {
     const newCase = createEmptyCase();
     state.cases.unshift(newCase);
@@ -616,6 +623,8 @@ function bindEvents() {
 }
 
 function init() {
+  const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+  applyTheme(savedTheme);
   renderFilters();
   bindEvents();
   const restored = restoreState();
