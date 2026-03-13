@@ -41,6 +41,7 @@
               导入 ZIP
               <input id="import-zip-input" type="file" accept=".zip" hidden />
             </label>
+            <button id="preview-json-btn">预览 JSON</button>
             <button id="duplicate-case-btn">复制</button>
             <button id="delete-case-btn" class="danger">删除</button>
             <button id="export-case-btn">导出当前 case</button>
@@ -56,20 +57,6 @@
 
         <section id="editor" class="editor hidden">
           <div class="editor-grid two-column-wide">
-            <section class="card ref-card left-panel">
-              <div class="field no-gap">
-                <div class="field-row">
-                  <label>参考图 / 参考素材</label>
-                </div>
-                <label id="ref-dropzone" class="ref-dropzone unified-dropzone">
-                  <input id="ref-upload" type="file" accept="image/*" multiple hidden />
-                  <strong>拖拽图片到这里，或点击上传</strong>
-                  <p>统一入口，不分家。上传后会自动写成 `ref/ref_XX.ext`。</p>
-                </label>
-                <div id="ref-grid" class="ref-grid empty">暂无参考图</div>
-              </div>
-            </section>
-
             <section class="card form-card single-column">
               <div class="field">
                 <label for="folder-name">文件夹名</label>
@@ -87,11 +74,11 @@
                   <select id="dimension-select">
                     <option value="">选择一个维度</option>
                   </select>
-                  <button id="add-dimension-select-btn">加入当前 case</button>
+                  <button id="clear-dimension-btn" class="danger" type="button">清空</button>
                 </div>
                 <div id="dimension-custom-wrap" class="inline-add hidden">
                   <input id="dimension-custom-input" type="text" placeholder="输入新的 dimension，例如：整体可用性" />
-                  <button id="confirm-dimension-custom-btn">新增并加入</button>
+                  <button id="confirm-dimension-custom-btn">新增</button>
                 </div>
               </div>
 
@@ -105,11 +92,11 @@
                   <select id="sub-dimension-select">
                     <option value="">选择一个子项</option>
                   </select>
-                  <button id="add-sub-dimension-select-btn">加入当前 case</button>
+                  <button id="clear-sub-dimension-btn" class="danger" type="button">清空</button>
                 </div>
                 <div id="sub-dimension-custom-wrap" class="inline-add hidden">
                   <input id="sub-dimension-custom-input" type="text" placeholder="输入新的 sub_dimension，例如：角色一致性保持" />
-                  <button id="confirm-sub-dimension-custom-btn">新增并加入</button>
+                  <button id="confirm-sub-dimension-custom-btn">新增</button>
                 </div>
               </div>
 
@@ -135,6 +122,30 @@
 
               <div id="validation-box" class="validation-box"></div>
             </section>
+
+            <section class="card ref-card right-panel">
+              <div class="field no-gap">
+                <div class="field-row">
+                  <label>参考图 / 参考素材</label>
+                </div>
+                <label id="ref-dropzone" class="ref-dropzone unified-dropzone">
+                  <input id="ref-upload" type="file" accept="image/*" multiple hidden />
+                  <strong>拖拽图片到这里，或点击上传</strong>
+                  <p>上传后会自动写成 `ref/ref_XX.ext`。</p>
+                </label>
+                <div id="ref-grid" class="ref-grid empty">暂无参考图</div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="json-preview-panel" class="card hidden">
+          <div class="field no-gap">
+            <div class="field-row">
+              <label>case.json 预览</label>
+              <button id="close-json-preview-btn" class="ghost-btn" type="button">收起</button>
+            </div>
+            <pre id="json-preview-content" class="json-preview"></pre>
           </div>
         </section>
       </main>

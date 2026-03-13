@@ -50,8 +50,8 @@ const els = {
   checkPointList: document.getElementById('check-point-list'),
   dimensionSelect: document.getElementById('dimension-select'),
   subDimensionSelect: document.getElementById('sub-dimension-select'),
-  addDimensionSelectBtn: document.getElementById('add-dimension-select-btn'),
-  addSubDimensionSelectBtn: document.getElementById('add-sub-dimension-select-btn'),
+  clearDimensionBtn: document.getElementById('clear-dimension-btn'),
+  clearSubDimensionBtn: document.getElementById('clear-sub-dimension-btn'),
   showDimensionCustomBtn: document.getElementById('show-dimension-custom-btn'),
   showSubDimensionCustomBtn: document.getElementById('show-sub-dimension-custom-btn'),
   dimensionCustomWrap: document.getElementById('dimension-custom-wrap'),
@@ -60,6 +60,10 @@ const els = {
   subDimensionCustomInput: document.getElementById('sub-dimension-custom-input'),
   confirmDimensionCustomBtn: document.getElementById('confirm-dimension-custom-btn'),
   confirmSubDimensionCustomBtn: document.getElementById('confirm-sub-dimension-custom-btn'),
+  previewJsonBtn: document.getElementById('preview-json-btn'),
+  jsonPreviewPanel: document.getElementById('json-preview-panel'),
+  jsonPreviewContent: document.getElementById('json-preview-content'),
+  closeJsonPreviewBtn: document.getElementById('close-json-preview-btn'),
   checkPointInput: document.getElementById('check-point-input'),
   addPromptBtn: document.getElementById('add-prompt-btn'),
   passRule: document.getElementById('pass-rule'),
@@ -242,15 +246,16 @@ function renderCaseList() {
   document.querySelectorAll('[data-case-id]').forEach((node) => node.addEventListener('click', () => selectCase(node.dataset.caseId)));
 }
 
-function renderTokenList(container, values, onRemove) {
+function renderTokenList(container, values, onRemove, options = {}) {
+  const { emptyText = '暂无', minLength = 0 } = options;
   if (!values.length) {
-    container.innerHTML = '<span class="muted">暂无</span>';
+    container.innerHTML = `<span class="muted">${escapeHtml(emptyText)}</span>`;
     return;
   }
   container.innerHTML = values.map((value, index) => `
     <span class="token">
       <span>${escapeHtml(value)}</span>
-      <button class="mini-btn" data-remove-index="${index}">×</button>
+      <button class="mini-btn" data-remove-index="${index}" ${values.length <= minLength ? 'disabled title="至少保留一项"' : ''}>删除</button>
     </span>
   `).join('');
   container.querySelectorAll('[data-remove-index]').forEach((btn) => btn.addEventListener('click', () => onRemove(Number(btn.dataset.removeIndex))));
@@ -332,11 +337,20 @@ function renderSelectedCase() {
   els.dimensionSelect.value = '';
   els.subDimensionSelect.value = '';
 
-  renderTokenList(els.dimensionList, c.dimension, (index) => { c.dimension.splice(index, 1); syncSelectedCase(); });
-  renderTokenList(els.subDimensionList, c.sub_dimension, (index) => { c.sub_dimension.splice(index, 1); syncSelectedCase(); });
+  renderTokenList(els.dimensionList, c.dimension, (index) => {
+    if (c.dimension.length <= 1) return;
+    c.dimension.splice(index, 1);
+    syncSelectedCase();
+  }, { emptyText: '至少选择一个 dimension', minLength: 1 });
+  renderTokenList(els.subDimensionList, c.sub_dimension, (index) => {
+    if (c.sub_dimension.length <= 1) return;
+    c.sub_dimension.splice(index, 1);
+    syncSelectedCase();
+  }, { emptyText: '至少选择一个 sub_dimension', minLength: 1 });
   renderTokenList(els.checkPointList, c.check_points, (index) => { c.check_points.splice(index, 1); syncSelectedCase(); });
   renderPrompts(c);
   renderRefs(c);
+  if (!els.jsonPreviewPanel.classList.contains('hidden')) renderJsonPreview();
 
   const errors = validateCase(c);
   els.validationBox.className = 'validation-box' + (errors.length ? ' error' : '');
@@ -360,11 +374,15 @@ function selectCase(id) {
 
 function addUniqueItem(field, value) {
   const c = getSelectedCase();
-  if (!c) return;
+  if (!c) return false;
   const trimmed = value.trim();
-  if (!trimmed) return;
-  if (!c[field].includes(trimmed)) c[field].push(trimmed);
-  syncSelectedCase();
+  if (!trimmed) return false;
+  if (!c[field].includes(trimmed)) {
+    c[field].push(trimmed);
+    syncSelectedCase();
+    return true;
+  }
+  return false;
 }
 
 function addOptionAndAttach(kind, value) {
@@ -373,6 +391,27 @@ function addOptionAndAttach(kind, value) {
   if (kind === 'dimension') state.dimensionOptions = dedupe([...state.dimensionOptions, trimmed]);
   if (kind === 'sub_dimension') state.subDimensionOptions = dedupe([...state.subDimensionOptions, trimmed]);
   addUniqueItem(kind, trimmed);
+}
+
+function clearFieldList(field) {
+  const c = getSelectedCase();
+  if (!c) return;
+  c[field] = [];
+  syncSelectedCase();
+}
+
+function renderJsonPreview() {
+  const c = getSelectedCase();
+  if (!c) {
+    els.jsonPreviewContent.textContent = '当前没有选中的 case。';
+    return;
+  }
+  els.jsonPreviewContent.textContent = JSON.stringify(caseToExportPayload(c), null, 2);
+}
+
+function toggleJsonPreview(show) {
+  els.jsonPreviewPanel.classList.toggle('hidden', !show);
+  if (show) renderJsonPreview();
 }
 
 function addCheckPoint() {
@@ -551,8 +590,16 @@ function bindEvents() {
   els.checkPointInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCheckPoint(); } });
   document.querySelector('[data-add="check_points"]').addEventListener('click', addCheckPoint);
 
-  els.addDimensionSelectBtn.addEventListener('click', () => addUniqueItem('dimension', els.dimensionSelect.value));
-  els.addSubDimensionSelectBtn.addEventListener('click', () => addUniqueItem('sub_dimension', els.subDimensionSelect.value));
+  els.dimensionSelect.addEventListener('change', () => {
+    addUniqueItem('dimension', els.dimensionSelect.value);
+    els.dimensionSelect.value = '';
+  });
+  els.subDimensionSelect.addEventListener('change', () => {
+    addUniqueItem('sub_dimension', els.subDimensionSelect.value);
+    els.subDimensionSelect.value = '';
+  });
+  els.clearDimensionBtn.addEventListener('click', () => clearFieldList('dimension'));
+  els.clearSubDimensionBtn.addEventListener('click', () => clearFieldList('sub_dimension'));
   els.showDimensionCustomBtn.addEventListener('click', () => toggleCustomWrap('dimension', true));
   els.showSubDimensionCustomBtn.addEventListener('click', () => toggleCustomWrap('sub_dimension', true));
   els.confirmDimensionCustomBtn.addEventListener('click', () => {
@@ -565,6 +612,8 @@ function bindEvents() {
     els.subDimensionCustomInput.value = '';
     toggleCustomWrap('sub_dimension', false);
   });
+  els.previewJsonBtn.addEventListener('click', () => toggleJsonPreview(true));
+  els.closeJsonPreviewBtn.addEventListener('click', () => toggleJsonPreview(false));
   els.dimensionCustomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); els.confirmDimensionCustomBtn.click(); } });
   els.subDimensionCustomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); els.confirmSubDimensionCustomBtn.click(); } });
 
