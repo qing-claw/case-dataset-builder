@@ -21,7 +21,7 @@
         <div class="sidebar-header">
           <div>
             <h1>Case Dataset Builder</h1>
-            <p>轻一点。先把 case 写清楚，再谈别的。</p>
+            <p>Case 编辑器</p>
           </div>
         </div>
 
@@ -40,7 +40,7 @@
         <header class="topbar compact">
           <div>
             <h2 id="editor-title">未选择 case</h2>
-            <p id="editor-subtitle">一个 case 一个子文件夹</p>
+            <p id="editor-subtitle"></p>
           </div>
           <div class="topbar-actions">
             <label class="import-btn">
@@ -57,8 +57,7 @@
         </header>
 
         <section id="empty-state" class="empty-state">
-          <h3>先建第一条 case</h3>
-          <p>只保留最关键的字段，别让工具比数据本身还吵。</p>
+          <h3>新建 case</h3>
         </section>
 
         <section id="editor" class="editor hidden">
@@ -66,64 +65,63 @@
             <section class="card form-card single-column">
               <div class="field">
                 <label for="folder-name">文件夹名</label>
-                <input id="folder-name" type="text" placeholder="例如：style_restore_001" />
-                <small>导出时会作为 case 子文件夹名。</small>
+                <input id="folder-name" type="text" placeholder="case_001" />
               </div>
 
               <div class="field">
                 <div class="field-title-row">
-                  <label>dimension（多选）</label>
+                  <label>dimension</label>
                   <button id="show-dimension-custom-btn" class="ghost-btn" type="button">新增维度</button>
                 </div>
                 <div id="dimension-list" class="token-list"></div>
                 <div class="select-add-row">
                   <select id="dimension-select">
-                    <option value="">选择一个维度</option>
+                    <option value="">选择</option>
                   </select>
                   <button id="clear-dimension-btn" class="danger" type="button">清空</button>
                 </div>
                 <div id="dimension-custom-wrap" class="inline-add hidden">
-                  <input id="dimension-custom-input" type="text" placeholder="输入新的 dimension，例如：整体可用性" />
+                  <input id="dimension-custom-input" type="text" placeholder="dimension" />
                   <button id="confirm-dimension-custom-btn">新增</button>
                 </div>
               </div>
 
               <div class="field">
                 <div class="field-title-row">
-                  <label>sub_dimension（多选）</label>
+                  <label>sub_dimension</label>
                   <button id="show-sub-dimension-custom-btn" class="ghost-btn" type="button">新增子项</button>
                 </div>
                 <div id="sub-dimension-list" class="token-list"></div>
                 <div class="select-add-row">
                   <select id="sub-dimension-select">
-                    <option value="">选择一个子项</option>
+                    <option value="">选择</option>
                   </select>
                   <button id="clear-sub-dimension-btn" class="danger" type="button">清空</button>
                 </div>
                 <div id="sub-dimension-custom-wrap" class="inline-add hidden">
-                  <input id="sub-dimension-custom-input" type="text" placeholder="输入新的 sub_dimension，例如：角色一致性保持" />
+                  <input id="sub-dimension-custom-input" type="text" placeholder="sub_dimension" />
                   <button id="confirm-sub-dimension-custom-btn">新增</button>
                 </div>
               </div>
 
               <div class="field">
-                <label>prompt（字符串列表）</label>
+                <label>prompt</label>
                 <div id="prompt-list" class="textarea-list"></div>
                 <button id="add-prompt-btn">新增 prompt</button>
               </div>
 
               <div class="field">
-                <label>check_points（可选）</label>
+                <label>check_points</label>
                 <div id="check-point-list" class="token-list"></div>
                 <div class="inline-add">
-                  <input id="check-point-input" type="text" placeholder="输入一个检查点后回车" />
+                  <input id="check-point-input" type="text" placeholder="check_point" />
                   <button data-add="check_points">添加</button>
                 </div>
               </div>
 
               <div class="field">
-                <label for="pass-rule">pass_rule（可选）</label>
-                <textarea id="pass-rule" rows="3" placeholder="例如：3 个检查点满足 2 个及以上算通过"></textarea>
+                <label for="pass-rule">pass_rule</label>
+                <textarea id="pass-rule" rows="3" placeholder="pass_rule"></textarea>
               </div>
 
               <div id="validation-box" class="validation-box"></div>
@@ -136,10 +134,9 @@
                 </div>
                 <label id="ref-dropzone" class="ref-dropzone unified-dropzone">
                   <input id="ref-upload" type="file" accept="image/*" multiple hidden />
-                  <strong>拖拽图片到这里，或点击上传</strong>
-                  <p>上传后会自动写成 `ref/ref_XX.ext`。</p>
+                  <strong>拖拽图片/链接或点击上传</strong>
                 </label>
-                <div id="ref-grid" class="ref-grid empty">暂无参考图</div>
+                <div id="ref-grid" class="ref-grid empty">无参考图</div>
               </div>
             </section>
           </div>
@@ -148,7 +145,7 @@
         <section id="json-preview-panel" class="card hidden">
           <div class="field no-gap">
             <div class="field-row">
-              <label>case.json 预览</label>
+              <label>case.json</label>
               <button id="close-json-preview-btn" class="ghost-btn" type="button">收起</button>
             </div>
             <pre id="json-preview-content" class="json-preview"></pre>

@@ -151,7 +151,7 @@ function persistState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(persistPayload(false)));
       if (!hasShownStorageWarning) {
         hasShownStorageWarning = true;
-        alert('本地存储空间不足：已仅保存文本字段。参考图不会自动恢复，请尽快导出 ZIP 备份。');
+        alert('本地空间不足，已仅保存文本。请导出 ZIP。');
       }
     } catch (fallbackError) {
       console.error('persistState fallback failed', fallbackError);
@@ -245,24 +245,24 @@ function validateFolderName(folderName, caseId) {
   }
 
   if (trimmed === '.' || trimmed === '..') {
-    errors.push('文件夹名不能是 . 或 ..');
+    errors.push('文件夹名无效');
   }
   if (INVALID_FOLDER_NAME_CHARS.test(trimmed)) {
-    errors.push('文件夹名不能包含 / \\ : * ? " < > | 等非法字符');
+    errors.push('文件夹名含非法字符');
   }
   if (trimmed.endsWith('.')) {
-    errors.push('文件夹名不能以 . 结尾');
+    errors.push('文件夹名无效');
   }
 
   const baseName = trimmed.split('.')[0]?.toUpperCase();
   if (RESERVED_WINDOWS_NAMES.has(baseName)) {
-    errors.push('文件夹名命中 Windows 保留名称，请更换');
+    errors.push('文件夹名保留');
   }
 
   const hasDuplicate = state.cases.some(
     (item) => item.id !== caseId && normalizedFolderName(item.folderName) === normalizedFolderName(trimmed)
   );
-  if (hasDuplicate) errors.push('文件夹名必须唯一（不区分大小写）');
+  if (hasDuplicate) errors.push('文件夹名重复');
 
   return errors;
 }
@@ -270,9 +270,9 @@ function validateFolderName(folderName, caseId) {
 function validateCase(c) {
   const errors = [];
   errors.push(...validateFolderName(c.folderName, c.id));
-  if (c.dimension.length === 0) errors.push('至少添加一个 dimension');
-  if (c.sub_dimension.length === 0) errors.push('至少添加一个 sub_dimension');
-  if (c.prompt.filter((x) => x.trim()).length === 0) errors.push('至少填写一个 prompt');
+  if (c.dimension.length === 0) errors.push('dimension 必填');
+  if (c.sub_dimension.length === 0) errors.push('sub_dimension 必填');
+  if (c.prompt.filter((x) => x.trim()).length === 0) errors.push('prompt 必填');
   return errors;
 }
 
@@ -286,8 +286,8 @@ function renderFilters() {
   const current = els.dimensionFilter.value;
   els.dimensionFilter.innerHTML = '<option value="">全部维度</option>' + [...filterValues].map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
   els.dimensionFilter.value = current;
-  populateSelect(els.dimensionSelect, state.dimensionOptions, '选择一个维度');
-  populateSelect(els.subDimensionSelect, state.subDimensionOptions, '选择一个子项');
+  populateSelect(els.dimensionSelect, state.dimensionOptions, '选择');
+  populateSelect(els.subDimensionSelect, state.subDimensionOptions, '选择');
 }
 
 function renderCaseList() {
@@ -299,7 +299,7 @@ function renderCaseList() {
   });
 
   if (filtered.length === 0) {
-    els.caseList.innerHTML = '<div class="case-item"><p>没有匹配的 case。空空如也，倒也诚实。</p></div>';
+    els.caseList.innerHTML = '<div class="case-item"><p>无匹配 case</p></div>';
     return;
   }
 
@@ -308,9 +308,9 @@ function renderCaseList() {
     return `
       <div class="case-item ${c.id === state.selectedId ? 'active' : ''}" data-case-id="${c.id}">
         <h4>${escapeHtml(c.folderName)}</h4>
-        <p>${escapeHtml(c.sub_dimension.join(' / ') || '未填写子项')}</p>
+        <p>${escapeHtml(c.sub_dimension.join(' / ') || '未填')}</p>
         <div class="meta">
-          ${(c.dimension.length ? c.dimension : ['未填维度']).map((d) => `<span class="chip">${escapeHtml(d)}</span>`).join('')}
+          ${(c.dimension.length ? c.dimension : ['未填']).map((d) => `<span class="chip">${escapeHtml(d)}</span>`).join('')}
           <span class="chip">prompt ${c.prompt.filter((x) => x.trim()).length}</span>
           <span class="chip">ref ${c.ref.length}</span>
           ${errors ? `<span class="chip">缺 ${errors} 项</span>` : '<span class="chip">可导出</span>'}
@@ -322,7 +322,7 @@ function renderCaseList() {
 }
 
 function renderTokenList(container, values, onRemove, options = {}) {
-  const { emptyText = '暂无', minLength = 0 } = options;
+  const { emptyText = '无', minLength = 0 } = options;
   if (!values.length) {
     container.innerHTML = `<span class="muted">${escapeHtml(emptyText)}</span>`;
     return;
@@ -330,7 +330,7 @@ function renderTokenList(container, values, onRemove, options = {}) {
   container.innerHTML = values.map((value, index) => `
     <span class="token">
       <span>${escapeHtml(value)}</span>
-      <button class="mini-btn" data-remove-index="${index}" ${values.length <= minLength ? 'disabled title="至少保留一项"' : ''}>删除</button>
+      <button class="mini-btn" data-remove-index="${index}" ${values.length <= minLength ? 'disabled' : ''}>删除</button>
     </span>
   `).join('');
   container.querySelectorAll('[data-remove-index]').forEach((btn) => btn.addEventListener('click', () => onRemove(Number(btn.dataset.removeIndex))));
@@ -343,7 +343,7 @@ function renderPrompts(c) {
         <strong>Prompt ${index + 1}</strong>
         <button class="mini-btn" data-remove-prompt="${index}">删除</button>
       </div>
-      <textarea data-prompt-index="${index}" rows="4" placeholder="输入这一条 prompt 变体">${escapeHtml(value)}</textarea>
+      <textarea data-prompt-index="${index}" rows="4" placeholder="prompt">${escapeHtml(value)}</textarea>
     </div>
   `).join('');
 
@@ -368,7 +368,7 @@ function renderPrompts(c) {
 function renderRefs(c) {
   if (!c.ref.length) {
     els.refGrid.className = 'ref-grid empty';
-    els.refGrid.textContent = '暂无参考图';
+    els.refGrid.textContent = '无参考图';
     return;
   }
   els.refGrid.className = 'ref-grid';
@@ -400,11 +400,12 @@ function renderSelectedCase() {
   els.editor.classList.toggle('hidden', !hasCase);
   if (!c) {
     els.editorTitle.textContent = '未选择 case';
+    els.editorSubtitle.textContent = '';
     return;
   }
 
   els.editorTitle.textContent = c.folderName;
-  els.editorSubtitle.textContent = c.dimension.join(' / ') || '先补维度';
+  els.editorSubtitle.textContent = c.dimension.join(' / ');
   els.folderName.value = c.folderName;
   els.passRule.value = c.pass_rule;
   els.dimensionCustomWrap.classList.add('hidden');
@@ -416,22 +417,22 @@ function renderSelectedCase() {
     if (c.dimension.length <= 1) return;
     c.dimension.splice(index, 1);
     syncSelectedCase();
-  }, { emptyText: '至少选择一个 dimension', minLength: 1 });
+  }, { emptyText: '未选', minLength: 1 });
   renderTokenList(els.subDimensionList, c.sub_dimension, (index) => {
     if (c.sub_dimension.length <= 1) return;
     c.sub_dimension.splice(index, 1);
     syncSelectedCase();
-  }, { emptyText: '至少选择一个 sub_dimension', minLength: 1 });
+  }, { emptyText: '未选', minLength: 1 });
   renderTokenList(els.checkPointList, c.check_points, (index) => { c.check_points.splice(index, 1); syncSelectedCase(); });
   renderPrompts(c);
   renderRefs(c);
   if (!els.jsonPreviewPanel.classList.contains('hidden')) renderJsonPreview();
 
   const errors = validateCase(c);
-  els.validationBox.className = 'validation-box' + (errors.length ? ' error' : '');
+  els.validationBox.className = 'validation-box' + (errors.length ? ' error' : ' hidden');
   els.validationBox.innerHTML = errors.length
-    ? `<strong>还差这几项：</strong><ul>${errors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
-    : '当前 case 已可导出。';
+    ? `<ul>${errors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
+    : '';
 }
 
 function syncSelectedCase() {
@@ -521,7 +522,7 @@ async function exportCurrentCase() {
 
 async function exportDataset() {
   const invalid = state.cases.map((c) => ({ c, errors: validateCase(c) })).filter((x) => x.errors.length);
-  if (invalid.length) return alert(`还有 ${invalid.length} 条 case 不可导出。先补齐必填项。`);
+  if (invalid.length) return alert(`有 ${invalid.length} 条 case 未完成，无法导出。`);
   const zip = new JSZip();
   const root = zip.folder('dataset');
   const casesRoot = root.folder('cases');
@@ -561,28 +562,163 @@ function fileToDataUrl(file) {
   });
 }
 
+function extensionFromMimeType(mimeType) {
+  const mime = (mimeType || '').toLowerCase();
+  if (!mime.startsWith('image/')) return '';
+  const raw = mime.split('/')[1]?.split(';')[0] || '';
+  if (!raw) return '';
+  if (raw === 'jpeg') return 'jpg';
+  if (raw === 'svg+xml') return 'svg';
+  return raw.split('+')[0];
+}
+
+function extensionFromName(name) {
+  const match = String(name || '').match(/\.([a-zA-Z0-9]+)(?:[?#].*)?$/);
+  return match?.[1]?.toLowerCase() || '';
+}
+
+function isImageFile(file) {
+  if (!file) return false;
+  if ((file.type || '').startsWith('image/')) return true;
+  return Boolean((file.name || '').match(/\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i));
+}
+
+function isZipFile(file) {
+  if (!file) return false;
+  if ((file.name || '').toLowerCase().endsWith('.zip')) return true;
+  const type = (file.type || '').toLowerCase();
+  return type.includes('zip');
+}
+
+function getZipFileFromDataTransfer(dataTransfer) {
+  const files = Array.from(dataTransfer?.files || []);
+  return files.find((file) => isZipFile(file)) || null;
+}
+
+function extractImageUrlsFromDataTransfer(dataTransfer) {
+  if (!dataTransfer) return [];
+  const urls = [];
+  const uriList = dataTransfer.getData('text/uri-list');
+  if (uriList) {
+    uriList
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+      .forEach((line) => urls.push(line));
+  }
+
+  const plainText = dataTransfer.getData('text/plain')?.trim();
+  if (plainText) urls.push(plainText);
+
+  const html = dataTransfer.getData('text/html');
+  if (html) {
+    try {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      doc.querySelectorAll('img[src]').forEach((img) => urls.push(img.src));
+      doc.querySelectorAll('a[href]').forEach((a) => {
+        const href = a.getAttribute('href') || '';
+        if (href.match(/\.(png|jpe?g|webp|gif|bmp|svg|avif)(\?|#|$)/i)) urls.push(href);
+      });
+    } catch (error) {
+      console.warn('Failed to parse dropped HTML', error);
+    }
+  }
+
+  return dedupe(urls).filter((url) => /^https?:\/\//i.test(url) || /^data:image\//i.test(url));
+}
+
+function buildFileNameFromUrl(url, index, mimeType) {
+  let rawName = '';
+  try {
+    const parsed = new URL(url);
+    rawName = decodeURIComponent(parsed.pathname.split('/').pop() || '');
+  } catch (error) {
+    rawName = '';
+  }
+
+  const ext = extensionFromName(rawName) || extensionFromMimeType(mimeType) || 'png';
+  const base = rawName && rawName.includes('.') ? rawName.slice(0, rawName.lastIndexOf('.')) : `remote_${String(index).padStart(2, '0')}`;
+  const safeBase = base.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || `remote_${String(index).padStart(2, '0')}`;
+  return `${safeBase}.${ext}`;
+}
+
+async function appendRefFile(c, file) {
+  const ext = extensionFromName(file.name) || extensionFromMimeType(file.type) || 'png';
+  const n = c.ref.length + 1;
+  const dataUrl = await fileToDataUrl(file);
+  c.ref.push({
+    id: uid(),
+    file,
+    url: URL.createObjectURL(file),
+    relativePath: `ref/ref_${String(n).padStart(2, '0')}.${ext}`,
+    dataUrl,
+  });
+}
+
 async function addRefFiles(files) {
   const c = getSelectedCase();
   if (!c || !files.length) return;
+  let added = 0;
   for (const file of files) {
-    if (!file.type.startsWith('image/')) continue;
-    const ext = file.name.split('.').pop() || 'png';
-    const n = c.ref.length + 1;
-    const dataUrl = await fileToDataUrl(file);
-    c.ref.push({
-      id: uid(),
-      file,
-      url: URL.createObjectURL(file),
-      relativePath: `ref/ref_${String(n).padStart(2, '0')}.${ext}`,
-      dataUrl,
-    });
+    if (!isImageFile(file)) continue;
+    await appendRefFile(c, file);
+    added += 1;
   }
-  syncSelectedCase();
+  if (added) syncSelectedCase();
+}
+
+async function addRefUrls(urls) {
+  const c = getSelectedCase();
+  if (!c || !urls.length) return;
+
+  let added = 0;
+  let failed = 0;
+  for (const [index, url] of urls.entries()) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const fileName = buildFileNameFromUrl(url, index + 1, blob.type);
+      const file = new File([blob], fileName, { type: blob.type || `image/${extensionFromName(fileName) || 'png'}` });
+      if (!isImageFile(file)) throw new Error('Not an image');
+      await appendRefFile(c, file);
+      added += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn('Failed to import dropped image URL', url, error);
+    }
+  }
+
+  if (added) syncSelectedCase();
+  if (failed) alert(`有 ${failed} 张图片导入失败。`);
+}
+
+async function addRefsFromDrop(dataTransfer) {
+  if (!dataTransfer) return;
+  const files = Array.from(dataTransfer.files || []);
+  const imageFiles = files.filter((file) => isImageFile(file));
+  if (imageFiles.length) {
+    await addRefFiles(imageFiles);
+    return;
+  }
+
+  const imageUrls = extractImageUrlsFromDataTransfer(dataTransfer);
+  if (imageUrls.length) await addRefUrls(imageUrls);
+}
+
+function isTargetInsideRefDropzone(target) {
+  return target instanceof Element && els.refDropzone.contains(target);
+}
+
+function hasFilePayload(dataTransfer) {
+  if (!dataTransfer) return false;
+  if (dataTransfer.files?.length) return true;
+  return Array.from(dataTransfer.types || []).includes('Files');
 }
 
 async function importDatasetZip(file) {
   if (!window.JSZip) return alert('JSZip 未加载，导入功能暂时不可用。');
-  if (state.cases.length && !confirm('导入 ZIP 会替换当前全部 case。建议先导出备份，确认继续吗？')) return;
+  if (state.cases.length && !confirm('导入会替换当前全部 case，继续？')) return;
   const zip = await window.JSZip.loadAsync(file);
   const caseJsonPaths = Object.keys(zip.files).filter((path) => /(^|\/)case\.json$/.test(path) && !path.includes('__MACOSX') && !path.split('/').pop().startsWith('._')).sort();
   if (!caseJsonPaths.length) return alert('没有在 ZIP 里找到 case.json。');
@@ -708,15 +844,42 @@ function bindEvents() {
   ['dragenter', 'dragover'].forEach((eventName) => {
     els.refDropzone.addEventListener(eventName, (e) => {
       e.preventDefault();
+      e.stopPropagation();
       els.refDropzone.classList.add('dragover');
     });
   });
-  ['dragleave', 'drop'].forEach((eventName) => {
-    els.refDropzone.addEventListener(eventName, (e) => {
-      e.preventDefault();
-      if (eventName === 'drop') addRefFiles(Array.from(e.dataTransfer.files || []));
+  els.refDropzone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isTargetInsideRefDropzone(e.relatedTarget)) {
       els.refDropzone.classList.remove('dragover');
-    });
+    }
+  });
+  els.refDropzone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const zipFile = getZipFileFromDataTransfer(e.dataTransfer);
+      if (zipFile) await importDatasetZip(zipFile);
+      else await addRefsFromDrop(e.dataTransfer);
+    } finally {
+      els.refDropzone.classList.remove('dragover');
+    }
+  });
+
+  document.addEventListener('dragover', (e) => {
+    if (!hasFilePayload(e.dataTransfer)) return;
+    if (isTargetInsideRefDropzone(e.target)) return;
+    e.preventDefault();
+  });
+
+  document.addEventListener('drop', async (e) => {
+    if (!hasFilePayload(e.dataTransfer)) return;
+    if (isTargetInsideRefDropzone(e.target)) return;
+    e.preventDefault();
+    const zipFile = getZipFileFromDataTransfer(e.dataTransfer);
+    if (!zipFile) return;
+    await importDatasetZip(zipFile);
   });
 
   els.importZipInput.addEventListener('change', async () => {
