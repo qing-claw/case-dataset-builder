@@ -19,6 +19,14 @@ const PRESET_SUB_DIMENSIONS = [
 
 const STORAGE_KEY = 'case-dataset-builder:v1';
 const THEME_KEY = 'case-dataset-builder:theme';
+const INVALID_FOLDER_NAME_CHARS = /[<>:"/\\|?*\u0000-\u001F]/;
+const RESERVED_WINDOWS_NAMES = new Set([
+  'CON', 'PRN', 'AUX', 'NUL',
+  'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+  'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+]);
+
+let hasShownStorageWarning = false;
 
 const state = {
   cases: [],
@@ -92,32 +100,63 @@ function createEmptyCase() {
   };
 }
 
-function serializableCase(c) {
+function serializableCase(c, includeRefData = true) {
   return {
     id: c.id,
     folderName: c.folderName,
     dimension: c.dimension,
     sub_dimension: c.sub_dimension,
     prompt: c.prompt,
-    ref: c.ref.map((r) => ({
+    ref: includeRefData ? c.ref.map((r) => ({
       id: r.id,
       name: r.file.name,
       type: r.file.type,
       relativePath: r.relativePath,
       dataUrl: r.dataUrl,
-    })),
+    })) : [],
     check_points: c.check_points,
     pass_rule: c.pass_rule,
   };
 }
 
-function persistState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+function persistPayload(includeRefData = true) {
+  return {
     selectedId: state.selectedId,
-    cases: state.cases.map(serializableCase),
+    cases: state.cases.map((c) => serializableCase(c, includeRefData)),
     dimensionOptions: state.dimensionOptions,
     subDimensionOptions: state.subDimensionOptions,
-  }));
+  };
+}
+
+function isQuotaExceededError(error) {
+  return error instanceof DOMException && (
+    error.code === 22 ||
+    error.code === 1014 ||
+    error.name === 'QuotaExceededError' ||
+    error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+  );
+}
+
+function persistState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistPayload(true)));
+    hasShownStorageWarning = false;
+  } catch (error) {
+    if (!isQuotaExceededError(error)) {
+      console.error('persistState failed', error);
+      return;
+    }
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persistPayload(false)));
+      if (!hasShownStorageWarning) {
+        hasShownStorageWarning = true;
+        alert('本地存储空间不足：已仅保存文本字段。参考图不会自动恢复，请尽快导出 ZIP 备份。');
+      }
+    } catch (fallbackError) {
+      console.error('persistState fallback failed', fallbackError);
+    }
+  }
 }
 
 function applyTheme(theme) {
@@ -151,6 +190,7 @@ function restoreState() {
       sub_dimension: c.sub_dimension || [],
       prompt: c.prompt?.length ? c.prompt : [''],
       ref: (c.ref || []).map((r) => {
+        if (!r?.dataUrl || !r?.name) return null;
         const file = dataUrlToFile(r.dataUrl, r.name, r.type);
         return {
           id: r.id || uid(),
@@ -159,7 +199,7 @@ function restoreState() {
           relativePath: r.relativePath,
           dataUrl: r.dataUrl,
         };
-      }),
+      }).filter(Boolean),
       check_points: c.check_points || [],
       pass_rule: c.pass_rule || '',
     }));
@@ -192,9 +232,44 @@ function caseToExportPayload(c) {
   };
 }
 
+function normalizedFolderName(value) {
+  return value.trim().toLowerCase();
+}
+
+function validateFolderName(folderName, caseId) {
+  const errors = [];
+  const trimmed = folderName.trim();
+  if (!trimmed) {
+    errors.push('文件夹名不能为空');
+    return errors;
+  }
+
+  if (trimmed === '.' || trimmed === '..') {
+    errors.push('文件夹名不能是 . 或 ..');
+  }
+  if (INVALID_FOLDER_NAME_CHARS.test(trimmed)) {
+    errors.push('文件夹名不能包含 / \\ : * ? " < > | 等非法字符');
+  }
+  if (trimmed.endsWith('.')) {
+    errors.push('文件夹名不能以 . 结尾');
+  }
+
+  const baseName = trimmed.split('.')[0]?.toUpperCase();
+  if (RESERVED_WINDOWS_NAMES.has(baseName)) {
+    errors.push('文件夹名命中 Windows 保留名称，请更换');
+  }
+
+  const hasDuplicate = state.cases.some(
+    (item) => item.id !== caseId && normalizedFolderName(item.folderName) === normalizedFolderName(trimmed)
+  );
+  if (hasDuplicate) errors.push('文件夹名必须唯一（不区分大小写）');
+
+  return errors;
+}
+
 function validateCase(c) {
   const errors = [];
-  if (!c.folderName.trim()) errors.push('文件夹名不能为空');
+  errors.push(...validateFolderName(c.folderName, c.id));
   if (c.dimension.length === 0) errors.push('至少添加一个 dimension');
   if (c.sub_dimension.length === 0) errors.push('至少添加一个 sub_dimension');
   if (c.prompt.filter((x) => x.trim()).length === 0) errors.push('至少填写一个 prompt');
@@ -507,6 +582,7 @@ async function addRefFiles(files) {
 
 async function importDatasetZip(file) {
   if (!window.JSZip) return alert('JSZip 未加载，导入功能暂时不可用。');
+  if (state.cases.length && !confirm('导入 ZIP 会替换当前全部 case。建议先导出备份，确认继续吗？')) return;
   const zip = await window.JSZip.loadAsync(file);
   const caseJsonPaths = Object.keys(zip.files).filter((path) => /(^|\/)case\.json$/.test(path) && !path.includes('__MACOSX') && !path.split('/').pop().startsWith('._')).sort();
   if (!caseJsonPaths.length) return alert('没有在 ZIP 里找到 case.json。');
